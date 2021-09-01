@@ -6,7 +6,9 @@
 #include "Camera/CameraComponent.h"
 
 // Sets default values
-AShooterCharacter::AShooterCharacter()
+AShooterCharacter::AShooterCharacter() :
+	BaseHorizontalRate(45.0f),
+	BaseVerticalRate(45.0f)
 {
  	// Set this character to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
@@ -21,6 +23,7 @@ AShooterCharacter::AShooterCharacter()
 	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
 	FollowCamera->SetupAttachment(SpringArm, USpringArmComponent::SocketName);	// Attach camera to end of spring arm
 	FollowCamera->bUsePawnControlRotation = false;	// Camera dose not rotate relative to arm
+    
 }
 
 // Called when the game starts or when spawned
@@ -45,6 +48,14 @@ void AShooterCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCo
 
 	PlayerInputComponent->BindAxis("MoveVertical", this, &AShooterCharacter::MoveVertical);
 	PlayerInputComponent->BindAxis("MoveHorizontal", this, &AShooterCharacter::MoveHorizontal);
+
+	PlayerInputComponent->BindAxis("TurnHorizontalRate", this, &AShooterCharacter::TurnHorizontalRate);
+	PlayerInputComponent->BindAxis("TurnVerticalRate", this, &AShooterCharacter::TurnVerticalRate);
+	PlayerInputComponent->BindAxis("TurnHorizontal", this, &APawn::AddControllerYawInput);
+	PlayerInputComponent->BindAxis("TurnVertical", this, &APawn::AddControllerPitchInput);
+
+	PlayerInputComponent->BindAction("Jump", IE_Pressed, this, &ACharacter::Jump);
+	PlayerInputComponent->BindAction("Jump", IE_Released, this, &ACharacter::StopJumping);
 }
 
 void AShooterCharacter::MoveVertical(float Value)
@@ -65,4 +76,16 @@ void AShooterCharacter::MoveVertical(float Value)
 void AShooterCharacter::MoveHorizontal(float Value)
 {
 	AddMovementInput(FRotationMatrix(Controller->GetControlRotation()).GetUnitAxis(EAxis::Y), Value);
+}
+
+
+void AShooterCharacter::TurnHorizontalRate(float Rate)
+{
+	// calculate delta for this frame from the rate information
+	// deg/sec * sec/frame = deg/frame
+	AddControllerYawInput(Rate * BaseHorizontalRate * GetWorld()->GetDeltaSeconds());
+}
+void AShooterCharacter::TurnVerticalRate(float Rate)
+{
+	AddControllerPitchInput(Rate * BaseVerticalRate * GetWorld()->GetDeltaSeconds());
 }

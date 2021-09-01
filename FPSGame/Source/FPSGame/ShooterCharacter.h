@@ -14,14 +14,23 @@ class FPSGAME_API AShooterCharacter : public ACharacter
 {
 	GENERATED_BODY()
 
-	// member variable declaration
+	// --- Member Variable ----
 private:
-	// spring arm은 캐릭터 뒤에서 바라보는 카메라이다.
+	// spring arm
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = true))
 	USpringArmComponent* SpringArm;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = true))
 	UCameraComponent* FollowCamera;
+
+	// base turn rate : deg/sec
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = true))
+	float BaseHorizontalRate;
+
+	// base look up down rate : deg/sec
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = true))
+	float BaseVerticalRate;
+    
 public:
 
 public:
@@ -40,12 +49,26 @@ public:
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
 
-	// member function declaration
+	// --- Member Function ----
 private:
 
 	// ---- Character Movement ----
 	void MoveVertical(float Value);
 	void MoveHorizontal(float Value);
+
+	// ---- Character View Movement ----
+
+	/**
+	 * Called via input to turn at a given rate
+	 * @Param Rate This is a normalized rate, i.e 1.0 means 100% of desired turn rate
+	*/
+	void TurnHorizontalRate(float Rate);
+
+	/**
+	 * Called via input to look up & down at a given rate
+	 * @Param Rate This is a normalized rate, i.e 1.0 means 100% of desired turn rate
+	*/
+	void TurnVerticalRate(float Rate);
 
 public:
 	FORCEINLINE USpringArmComponent* GetSpringArm() const { return SpringArm; }
