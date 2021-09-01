@@ -70,6 +70,9 @@ private:
 	*/
 	void TurnVerticalRate(float Rate);
 
+	void FireWeapon();
+
+
 public:
 	FORCEINLINE USpringArmComponent* GetSpringArm() const { return SpringArm; }
 	FORCEINLINE UCameraComponent* GetFollowCamera() const { return FollowCamera; }
