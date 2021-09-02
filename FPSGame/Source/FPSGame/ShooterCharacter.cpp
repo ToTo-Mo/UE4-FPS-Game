@@ -5,6 +5,9 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "Camera/CameraComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Kismet/GameplayStatics.h"
+#include "Sound/SoundCue.h"
+#include "Engine/SkeletalMeshSocket.h"
 
 // Sets default values
 AShooterCharacter::AShooterCharacter() :
@@ -35,8 +38,6 @@ AShooterCharacter::AShooterCharacter() :
 	GetCharacterMovement()->RotationRate = FRotator(0.0f, 540.0f, 0.0f); // at this rotation rate
 	GetCharacterMovement()->JumpZVelocity = 600.0f;
 	GetCharacterMovement()->AirControl = 0.2f;
-
-
 }
 
 // Called when the game starts or when spawned
@@ -107,5 +108,26 @@ void AShooterCharacter::TurnVerticalRate(float Rate)
 void AShooterCharacter::FireWeapon()
 {
 	UE_LOG(LogTemp, Warning, TEXT("Fire"));
+
+	if (nullptr == FireSound)
+	{
+		return;
+	}
+
+	UGameplayStatics::PlaySound2D(this, FireSound);
+
+	const USkeletalMeshSocket* MuzzleSocket = GetMesh()->GetSocketByName("MuzzleSocket");
+
+	if(nullptr == MuzzleSocket)
+	{
+		return;
+	}
+
+	const FTransform SocketTransform = MuzzleSocket->GetSocketTransform(GetMesh());
+
+	if(nullptr == MuzzleFlash)
+	{
+		UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), MuzzleFlash, SocketTransform);
+	}
 }
 

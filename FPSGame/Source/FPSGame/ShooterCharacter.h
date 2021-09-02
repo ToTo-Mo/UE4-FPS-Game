@@ -30,6 +30,14 @@ private:
 	// base look up down rate : deg/sec
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = true))
 	float BaseVerticalRate;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Combat, meta = (AllowPrivateAccess = true))
+	class USoundCue* FireSound;
+
+	/** Flash spawns at the muzzle*/
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Combat, meta = (AllowPrivateAccess = true))
+	class UParticleSystem* MuzzleFlash;
+	
     
 public:
 
@@ -71,7 +79,6 @@ private:
 	void TurnVerticalRate(float Rate);
 
 	void FireWeapon();
-
 
 public:
 	FORCEINLINE USpringArmComponent* GetSpringArm() const { return SpringArm; }
