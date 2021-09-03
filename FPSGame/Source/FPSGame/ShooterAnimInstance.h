@@ -36,5 +36,9 @@ private:
 	bool bIsAccelerating;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Movement, meta = (AllowPrivateAccess = true))
-	float MovementOffset;
+	float MovementOffsetYaw;
+
+	/** Offset yaw the frame before stopped*/
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Movement, meta = (AllowPrivateAccess = true))
+	float LastMovementOffsetYaw;
 };
