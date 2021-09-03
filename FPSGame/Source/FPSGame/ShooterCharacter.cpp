@@ -8,6 +8,8 @@
 #include "Kismet/GameplayStatics.h"
 #include "Sound/SoundCue.h"
 #include "Engine/SkeletalMeshSocket.h"
+#include "DrawDebugHelpers.h"
+#include "Particles/ParticleSystemComponent.h"
 
 // Sets default values
 AShooterCharacter::AShooterCharacter() :
@@ -22,6 +24,7 @@ AShooterCharacter::AShooterCharacter() :
 	SpringArm->SetupAttachment(RootComponent);
 	SpringArm->TargetArmLength = 300.0f;	// The camera follows as this distance behind the character
 	SpringArm->bUsePawnControlRotation = true;	// Rotate and arm based on the controller
+	SpringArm->SocketOffset = FVector(0.0f, 50.f, 50.f);
 
 	// Camera
 	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
@@ -30,11 +33,11 @@ AShooterCharacter::AShooterCharacter() :
     
 	// Don't rotate when the controller rotates. Let the controller only affect the camera
 	bUseControllerRotationPitch = false;
-	bUseControllerRotationYaw = false;
+	bUseControllerRotationYaw = true;
 	bUseControllerRotationRoll = false;
 
 	// Configure character movement
-	GetCharacterMovement()->bOrientRotationToMovement = true; // Character moves in the direction of input
+	GetCharacterMovement()->bOrientRotationToMovement = false; // Character moves in the direction of input
 	GetCharacterMovement()->RotationRate = FRotator(0.0f, 540.0f, 0.0f); // at this rotation rate
 	GetCharacterMovement()->JumpZVelocity = 600.0f;
 	GetCharacterMovement()->AirControl = 0.2f;
@@ -107,27 +110,132 @@ void AShooterCharacter::TurnVerticalRate(float Rate)
 
 void AShooterCharacter::FireWeapon()
 {
-	UE_LOG(LogTemp, Warning, TEXT("Fire"));
-
-	if (nullptr == FireSound)
-	{
-		return;
-	}
-
+	// 1. play fire sound
+	if (nullptr == FireSound) return;
 	UGameplayStatics::PlaySound2D(this, FireSound);
 
+	// 2. find muzzle socket form skeleton
 	const USkeletalMeshSocket* MuzzleSocket = GetMesh()->GetSocketByName("MuzzleSocket");
+	if(nullptr == MuzzleSocket) return;
 
-	if(nullptr == MuzzleSocket)
-	{
-		return;
-	}
-
+	// 3. find transform of muzzle socket
 	const FTransform SocketTransform = MuzzleSocket->GetSocketTransform(GetMesh());
+	if(nullptr == MuzzleFlash) return;
 
-	if(nullptr == MuzzleFlash)
+	// 4. create muzzle effect
+	UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), MuzzleFlash, SocketTransform);
+
+	// 5. find bullet trail end position
+	FVector BulletTrailEndLocation;
+	bool bBulletTrailEnd = GetBulletTrailEndLocation(SocketTransform.GetLocation(), BulletTrailEndLocation);
+
+	// 6. 
+	if (bBulletTrailEnd)
 	{
-		UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), MuzzleFlash, SocketTransform);
+		// 8-7. spawn impact particles after updating bullet trail end point
+		if (ImpactParticles)
+		{
+			UGameplayStatics::SpawnEmitterAtLocation(
+				GetWorld(),
+				ImpactParticles,
+				BulletTrailEndLocation
+			);
+		}
+
+		if (BeamParticles)
+		{
+			UParticleSystemComponent* BulletTrail = UGameplayStatics::SpawnEmitterAtLocation(
+				GetWorld(),
+				BeamParticles,
+				SocketTransform
+			);
+
+			if (BulletTrail)
+			{
+				BulletTrail->SetVectorParameter(FName("Target"), BulletTrailEndLocation);
+			}
+		}
 	}
+	
+	// 7. play weapon fire montage
+	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+	if (nullptr == AnimInstance && nullptr == HipFireMontage) return;
+
+	AnimInstance->Montage_Play(HipFireMontage);
+	AnimInstance->Montage_JumpToSection(FName("StartFire"));
+}
+
+bool AShooterCharacter::GetBulletTrailEndLocation(const FVector MuzzleSocketLocation, FVector& OutBulletTrailLocation)
+{
+	// 5. Get current size of viewport
+	FVector2D ViewporSize;
+
+	if (GEngine && GEngine->GameViewport)
+	{
+		GEngine->GameViewport->GetViewportSize(ViewporSize);
+	}
+
+	// 6. Get screen space location of cross hairs
+	FVector2D CrosshairLocation(ViewporSize.X / 2.f, ViewporSize.Y / 2.f);
+	CrosshairLocation.Y -= 50.f;
+	FVector CrosshairWorldPosition;
+	FVector CrosshairWorldDirection;
+
+	// 7. get world position and direction of cross hairs
+	bool bScreenToWorld = UGameplayStatics::DeprojectScreenToWorld(
+		UGameplayStatics::GetPlayerController(this, 0),
+		CrosshairLocation,
+		CrosshairWorldPosition,
+		CrosshairWorldDirection
+	);
+
+	// 8. was deprojection successful?
+	if (bScreenToWorld)
+	{
+		FHitResult ScreenTraceHit;
+
+		const FVector ScreenTraceStart{ CrosshairWorldPosition };
+		const FVector ScreenTraceEnd{ CrosshairWorldPosition + CrosshairWorldDirection * 50'000.f };
+
+		// 8-1. Set beam end point to line trace end point
+		OutBulletTrailLocation = ScreenTraceEnd;
+
+		// 8-2. Trace outward from cross hairs world location
+		GetWorld()->LineTraceSingleByChannel(
+			ScreenTraceHit,
+			ScreenTraceStart,
+			ScreenTraceEnd,
+			ECollisionChannel::ECC_Visibility
+		);
+
+		// 8-3. was there a trace hit?
+		if (ScreenTraceHit.bBlockingHit)
+		{
+			// 8-4. bullet trail end point in now trace hit location
+			OutBulletTrailLocation = ScreenTraceHit.Location;
+		}
+
+		// 8-5. trace hit from muzzle
+		FHitResult MuzzleTraceHit;
+		const FVector MuzzleTraceStart{ MuzzleSocketLocation };
+		const FVector MuzzleTraceEnd{ OutBulletTrailLocation };
+
+		GetWorld()->LineTraceSingleByChannel(
+			MuzzleTraceHit,
+			MuzzleTraceStart,
+			MuzzleTraceEnd,
+			ECollisionChannel::ECC_Visibility
+		);
+
+		// 8-6. object between barrel and BulletTrailEndPoint
+		if (MuzzleTraceHit.bBlockingHit)
+		{
+			OutBulletTrailLocation = MuzzleTraceHit.Location;
+		}
+
+		return true;
+	}
+
+	return false;
 }
 
